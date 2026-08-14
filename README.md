@@ -18,14 +18,75 @@ no manual "watch" clicks needed) and a plain REST API any other app can call.
 
 ## Setup
 
-```bash
-npm install
-cp .env.example .env   # generate a SESSION_SECRET, see comments inline
-npm start               # or `npm run dev` for auto-reload
-```
+1. **Clone and install:**
+   ```bash
+   git clone https://github.com/virinchisai/temp-mail-agent.git
+   cd temp-mail-agent
+   npm install
+   ```
+   You'll see a few `npm WARN deprecated` lines and a note about "2 moderate
+   severity vulnerabilities" — both expected, both benign, both explained in
+   [Known low-risk advisory](#known-low-risk-advisory) below. Nothing to fix.
 
-Server runs on `http://localhost:4000` by default — open it in a browser
-for the dashboard, or drive the API directly.
+2. **Create your config:**
+   ```bash
+   cp .env.example .env
+   ```
+
+3. **Generate a session secret** (signs login sessions — without this the
+   server still runs in dev mode, but every restart logs everyone out):
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+   Copy the output into `.env` as `SESSION_SECRET=<value>`.
+
+4. **Start the server:**
+   ```bash
+   npm start        # or `npm run dev` for auto-reload on file changes
+   ```
+   You should see `temp-mail-agent listening on http://localhost:4000`.
+   Open that URL in a browser for the dashboard, or drive the API directly.
+
+5. **Stop it later** with `Ctrl+C` in that terminal, or see
+   [Troubleshooting](#troubleshooting) below if you lose track of it.
+
+## Troubleshooting
+
+**`Error: listen EADDRINUSE: address already in use :::4000`**
+Something (often a previous `npm start` you forgot about) is still bound to
+the port. Free it, then retry:
+```bash
+lsof -ti:4000 -sTCP:LISTEN | xargs -r kill
+```
+If you changed `PORT` in `.env`, swap `4000` for that value. To check what's
+using a port without killing it first: `lsof -i:4000`.
+
+**Server exits immediately in production with `SESSION_SECRET must be set`**
+Expected — production mode refuses to run with an insecure auto-generated
+secret. Do step 3 above and set `NODE_ENV=production` only once
+`SESSION_SECRET` is actually set (locally in `.env`, or as a `fly secrets
+set` value when deploying — see below).
+
+**`npm install` shows deprecation warnings / "2 moderate severity
+vulnerabilities"**
+Expected, see [Known low-risk advisory](#known-low-risk-advisory).
+
+**`502 Failed to provision mailbox from upstream provider` / similar**
+The free [mail.tm](https://mail.tm) API this project depends on is
+occasionally slow or briefly unavailable — it's outside this project's
+control. Wait a few seconds and retry; if `GET /health` on this server
+still returns `200`, the server itself is fine.
+
+**"Invalid API key" or "Invalid or missing credentials"**
+The key was never issued (typo), belongs to a different account, or you're
+pointed at a different server than the one that issued it. Get a fresh one
+via the dashboard (sign up or log in, then check the header) or
+`POST /api/auth/signup`.
+
+**Dashboard won't stay logged in across restarts**
+`SESSION_SECRET` wasn't set, so a new random one was generated at startup
+and every previous session's cookie stopped verifying. Set it in `.env`
+(step 3 above) to fix this permanently.
 
 ## Accounts, sessions, and MFA
 
