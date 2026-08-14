@@ -316,6 +316,18 @@ input[type="text"], input[type="number"] {
 }
 .msg-top { display: flex; justify-content: space-between; gap: 8px; color: var(--text-muted); }
 .msg-body { margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
+.reply-link {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 9px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  text-decoration: none;
+}
+.reply-link:hover { filter: brightness(1.08); }
 
 /* --- Toasts --- */
 .toasts {

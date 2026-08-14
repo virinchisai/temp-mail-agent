@@ -579,7 +579,7 @@
       </div>
       ${ui.live && !ui.otp ? `<div class="live-indicator"><span class="live-dot"></span>Live — mail will appear here automatically</div>` : ''}
       ${ui.otp ? otpPanelHtml(ui.otp) : ''}
-      ${ui.expanded ? messagesHtml(ui) : ''}
+      ${ui.expanded ? messagesHtml(ui, kind) : ''}
     `;
   }
 
@@ -593,7 +593,19 @@
     `;
   }
 
-  function messagesHtml(ui) {
+  // Opens the user's own real email client, pre-filled to reply to the
+  // sender — not a "send as the disposable address" feature. See README
+  // for why actual sending from the temp address isn't built.
+  function mailtoReplyHref(m) {
+    const to = m.from || '';
+    const subject = `Re: ${m.subject || ''}`;
+    const quotedDate = m.receivedAt ? new Date(m.receivedAt).toLocaleString() : '';
+    const quotedBody = (m.text || '').split('\n').map((line) => `> ${line}`).join('\n');
+    const body = `\n\n\nOn ${quotedDate}, ${to} wrote:\n${quotedBody}`;
+    return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
+
+  function messagesHtml(ui, kind) {
     if (ui.loadingMessages) return `<div class="msg-list muted"><span class="spinner"></span>Loading…</div>`;
     if (!ui.messages || ui.messages.length === 0) return `<div class="msg-list muted">No messages yet.</div>`;
     return `<div class="msg-list">${ui.messages.map((m) => `
@@ -604,6 +616,7 @@
         </div>
         ${m.subject ? `<div><strong>${escapeHtml(m.subject)}</strong></div>` : ''}
         <div class="msg-body">${escapeHtml((m.text || '').slice(0, 500))}</div>
+        ${kind === 'emails' && m.from ? `<a class="small reply-link" href="${escapeHtml(mailtoReplyHref(m))}" title="Opens your own email client">↩ Reply</a>` : ''}
       </div>
     `).join('')}</div>`;
   }
