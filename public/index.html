@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>temp-mail-agent</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- Shown until logged in (session cookie or pasted API key) -->
+    <section id="gate" class="gate hidden">
+      <div class="gate-card">
+        <h1>temp-mail-agent</h1>
+
+        <div class="tabs">
+          <button id="tabLogin" class="tab active" type="button">Log in</button>
+          <button id="tabSignup" class="tab" type="button">Sign up</button>
+        </div>
+
+        <form id="loginForm" class="gate-block">
+          <label for="loginEmail">Email</label>
+          <input id="loginEmail" type="email" autocomplete="username" required />
+          <label for="loginPassword">Password</label>
+          <input id="loginPassword" type="password" autocomplete="current-password" required />
+          <div id="loginMfaBlock" class="hidden">
+            <label for="loginMfaCode">Authenticator code (or a backup code)</label>
+            <input id="loginMfaCode" type="text" inputmode="numeric" autocomplete="one-time-code" />
+          </div>
+          <button id="loginBtn" class="primary" type="submit">Log in</button>
+        </form>
+
+        <form id="signupForm" class="gate-block hidden">
+          <label for="signupEmail">Email</label>
+          <input id="signupEmail" type="email" autocomplete="username" required />
+          <label for="signupPassword">Password (min 10 characters)</label>
+          <input id="signupPassword" type="password" autocomplete="new-password" minlength="10" required />
+          <label for="signupLabel">Label (optional)</label>
+          <input id="signupLabel" type="text" placeholder="e.g. my laptop" />
+          <button id="signupBtn" class="primary" type="submit">Create account</button>
+        </form>
+
+        <div class="gate-sep">or</div>
+
+        <details class="gate-details">
+          <summary class="muted">Use an API key instead</summary>
+          <div class="gate-block">
+            <label for="pasteKey">Existing API key</label>
+            <input id="pasteKey" type="text" placeholder="tma_..." />
+            <button id="pasteKeyBtn" type="button">Use this key</button>
+          </div>
+        </details>
+
+        <p id="gateError" class="error hidden"></p>
+      </div>
+    </section>
+
+    <!-- Main dashboard, shown once we have a valid key -->
+    <div id="dashboard" class="hidden">
+      <header class="topbar">
+        <div class="brand">temp-mail-agent</div>
+        <div class="account">
+          <span id="accountLabel" class="muted"></span>
+          <span id="mfaBadge" class="badge"></span>
+          <span id="phoneProviderBadge" class="badge"></span>
+          <span class="keybox">
+            <code id="apiKeyDisplay">••••••••</code>
+            <button id="toggleKeyBtn" title="Show/hide key">👁</button>
+            <button id="copyKeyBtn" title="Copy key">📋</button>
+          </span>
+          <button id="mfaManageBtn" class="ghost">Security</button>
+          <button id="signOutBtn" class="ghost">Log out</button>
+        </div>
+      </header>
+
+      <section id="mfaPanel" class="mfa-panel hidden">
+        <div id="mfaPanelContent"></div>
+      </section>
+
+      <main class="columns">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Email inboxes</h2>
+            <div class="new-form">
+              <button id="refreshEmailsBtn" class="ghost" title="Refresh inbox list">🔄</button>
+              <input id="emailTtl" type="number" min="1" max="1440" value="15" title="TTL in minutes" />
+              <span class="muted">min</span>
+              <button id="createEmailBtn" class="primary">+ New inbox</button>
+            </div>
+          </div>
+          <div id="emailList" class="card-list">
+            <p class="empty muted">No inboxes yet — create one above.</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Phone numbers</h2>
+            <div class="new-form">
+              <button id="refreshPhonesBtn" class="ghost" title="Refresh number list">🔄</button>
+              <input id="phoneTtl" type="number" min="1" max="1440" value="15" title="TTL in minutes" />
+              <span class="muted">min</span>
+              <button id="createPhoneBtn" class="primary">+ New number</button>
+            </div>
+          </div>
+          <div id="phoneList" class="card-list">
+            <p class="empty muted">No numbers yet — create one above.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toasts" class="toasts"></div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
