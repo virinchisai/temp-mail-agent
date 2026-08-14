@@ -84,6 +84,9 @@
             <h2>Email inboxes</h2>
             <div class="new-form">
               <button id="refreshEmailsBtn" class="ghost" title="Refresh inbox list">🔄</button>
+              <input id="emailPrefix" type="text" placeholder="random" title="Custom prefix (optional) — leave blank for a random one" class="prefix-input" />
+              <span class="muted">@</span>
+              <select id="emailDomain" title="Domain"></select>
               <input id="emailTtl" type="number" min="1" max="1440" value="15" title="TTL in minutes" />
               <span class="muted">min</span>
               <button id="createEmailBtn" class="primary">+ New inbox</button>

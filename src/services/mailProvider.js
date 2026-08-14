@@ -12,27 +12,77 @@ async function apiFetch(pathname, opts = {}) {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`mail.tm ${opts.method || 'GET'} ${pathname} -> ${res.status}: ${body}`);
+    const err = new Error(`mail.tm ${opts.method || 'GET'} ${pathname} -> ${res.status}: ${body}`);
+    err.status = res.status;
+    throw err;
   }
   if (res.status === 204) return null;
   return res.json();
 }
 
-async function pickDomain() {
+// Domains rarely change; avoid re-fetching on every dashboard load.
+let domainCache = { domains: [], fetchedAt: 0 };
+const DOMAIN_CACHE_TTL_MS = 5 * 60_000;
+
+async function listDomains() {
+  if (domainCache.domains.length && Date.now() - domainCache.fetchedAt < DOMAIN_CACHE_TTL_MS) {
+    return domainCache.domains;
+  }
   const data = await apiFetch('/domains?page=1');
-  const domain = (data['hydra:member'] || []).find((d) => d.isActive);
-  if (!domain) throw new Error('No active mail.tm domains available right now');
-  return domain.domain;
+  const domains = (data['hydra:member'] || []).filter((d) => d.isActive).map((d) => d.domain);
+  domainCache = { domains, fetchedAt: Date.now() };
+  return domains;
 }
 
-async function createMailbox() {
-  const domain = await pickDomain();
-  const address = `${randomLocalPart()}@${domain}`;
+async function resolveDomain(requested) {
+  const domains = await listDomains();
+  if (!domains.length) throw new Error('No active mail.tm domains available right now');
+  if (!requested) return domains[0];
+  if (!domains.includes(requested)) {
+    const err = new Error(`"${requested}" isn't a currently active domain`);
+    err.userFacing = true;
+    throw err;
+  }
+  return requested;
+}
+
+const PREFIX_PATTERN = /^[a-z0-9._-]{1,32}$/;
+
+function sanitizePrefix(prefix) {
+  const cleaned = String(prefix).trim().toLowerCase();
+  if (!PREFIX_PATTERN.test(cleaned)) {
+    const err = new Error('Prefix must be 1-32 characters: letters, numbers, dots, underscores, or hyphens only');
+    err.userFacing = true;
+    throw err;
+  }
+  return cleaned;
+}
+
+async function createMailbox({ prefix, domain } = {}) {
+  const resolvedDomain = await resolveDomain(domain);
+  const localPart = prefix ? sanitizePrefix(prefix) : randomLocalPart();
+  const address = `${localPart}@${resolvedDomain}`;
   const password = generatePassword();
-  await apiFetch('/accounts', {
-    method: 'POST',
-    body: JSON.stringify({ address, password }),
-  });
+  try {
+    await apiFetch('/accounts', {
+      method: 'POST',
+      body: JSON.stringify({ address, password }),
+    });
+  } catch (err) {
+    if (err.status === 422 || err.status === 409) {
+      const taken = new Error(`"${address}" is already taken — try a different prefix`);
+      taken.userFacing = true;
+      taken.httpStatus = 400;
+      throw taken;
+    }
+    if (err.status === 429) {
+      const limited = new Error('mail.tm rate-limited this request — wait a few seconds and try again');
+      limited.userFacing = true;
+      limited.httpStatus = 429;
+      throw limited;
+    }
+    throw err;
+  }
   const token = await login(address, password);
   return { address, password, token };
 }
@@ -98,4 +148,4 @@ async function deleteMailbox(mailbox) {
   }
 }
 
-module.exports = { createMailbox, listMessages, deleteMailbox, login };
+module.exports = { createMailbox, listMessages, deleteMailbox, login, listDomains };

@@ -156,6 +156,19 @@
 
     document.getElementById('apiKeyDisplay').dataset.full = state.account.apiKey;
     setKeyMasked(true);
+
+    loadEmailDomains();
+  }
+
+  async function loadEmailDomains() {
+    const select = document.getElementById('emailDomain');
+    try {
+      const data = await api('/api/emails/domains');
+      select.innerHTML = data.domains.map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+    } catch (err) {
+      select.innerHTML = '';
+      toast(`Could not load domains: ${err.message}`, 'error');
+    }
   }
 
   async function handleSignup(e) {
@@ -380,13 +393,43 @@
 
   async function createEmail(parentId) {
     const ttlMinutes = Number(document.getElementById('emailTtl').value) || 15;
+    const prefix = document.getElementById('emailPrefix').value.trim();
+    const domain = document.getElementById('emailDomain').value || undefined;
     try {
-      const item = await api('/api/emails', { method: 'POST', body: JSON.stringify({ ttlMinutes, parentId }) });
+      const item = await api('/api/emails', {
+        method: 'POST',
+        body: JSON.stringify({ ttlMinutes, parentId, prefix: prefix || undefined, domain }),
+      });
       toast(parentId ? 'Child inbox created' : 'Inbox created', 'success');
+      document.getElementById('emailPrefix').value = '';
       await refreshEmails();
       startLive(item.id, 'emails'); // in case refreshEmails() lands before render — cheap no-op if already running
     } catch (err) {
       toast(`Create failed: ${err.message}`, 'error');
+    }
+  }
+
+  // "Forget me"-style quick regenerate: delete this inbox, get a fresh
+  // random one in its place. Ignores the prefix field (that's for
+  // deliberate custom addresses) so this is always instant and random.
+  async function regenerateEmail(id) {
+    const ttlMinutes = Number(document.getElementById('emailTtl').value) || 15;
+    const ui = uiFor(id);
+    if (ui.watchTimer) clearInterval(ui.watchTimer);
+    state.ui.delete(id);
+    try {
+      await api(`/api/emails/${id}`, { method: 'DELETE' });
+    } catch {
+      // proceed anyway — worst case the old one lingers until it expires
+    }
+    try {
+      const item = await api('/api/emails', { method: 'POST', body: JSON.stringify({ ttlMinutes }) });
+      toast('New address generated', 'success');
+      await refreshEmails();
+      startLive(item.id, 'emails');
+    } catch (err) {
+      toast(`Could not generate new address: ${err.message}`, 'error');
+      await refreshEmails();
     }
   }
 
@@ -531,6 +574,7 @@
         <button class="small" data-action="extend" data-kind="${kind}" data-id="${id}" data-minutes="15">+15m</button>
         <button class="small" data-action="extend" data-kind="${kind}" data-id="${id}" data-minutes="60">+60m</button>
         ${kind === 'emails' && !item.parentId ? `<button class="small" data-action="child" data-id="${id}">+ Child inbox</button>` : ''}
+        ${kind === 'emails' ? `<button class="small" data-action="regenerate" data-id="${id}" title="Delete this and get a fresh random address">🔁 New address</button>` : ''}
         <button class="small danger" data-action="delete" data-kind="${kind}" data-id="${id}">Delete</button>
       </div>
       ${ui.live && !ui.otp ? `<div class="live-indicator"><span class="live-dot"></span>Live — mail will appear here automatically</div>` : ''}
@@ -636,6 +680,7 @@
     else if (action === 'extend') (kind === 'emails' ? extendEmail : extendPhone)(id, Number(minutes));
     else if (action === 'delete') (kind === 'emails' ? deleteEmail : deletePhone)(id);
     else if (action === 'child') createEmail(id);
+    else if (action === 'regenerate') regenerateEmail(id);
     else if (action === 'copy') copyToClipboard(value, kind === 'emails' ? 'address' : 'number');
     else if (action === 'copy-otp') copyToClipboard(value, 'OTP');
   }

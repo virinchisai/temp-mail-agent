@@ -213,8 +213,18 @@ input[type="text"], input[type="number"] {
   margin-bottom: 14px;
 }
 .panel-head h2 { margin: 0; font-size: 16px; }
-.new-form { display: flex; align-items: center; gap: 6px; }
+.new-form { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .new-form input[type="number"] { width: 64px; }
+.new-form .prefix-input { width: 110px; }
+.new-form select {
+  font: inherit;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 6px;
+  color: var(--text);
+  max-width: 160px;
+}
 
 .card-list { display: flex; flex-direction: column; gap: 10px; }
 .empty { text-align: center; padding: 24px 0; font-size: 13px; }

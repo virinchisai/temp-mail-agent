@@ -35,8 +35,9 @@ function loadOwnedMailbox(req, res) {
 
 // Create a new disposable inbox. Pass parentId to create a "child" inbox
 // grouped under an existing one (useful for e.g. per-test-run aliases).
+// prefix/domain let you pick the address instead of getting a random one.
 router.post('/', async (req, res) => {
-  const { ttlMinutes = DEFAULT_TTL_MINUTES, parentId } = req.body || {};
+  const { ttlMinutes = DEFAULT_TTL_MINUTES, parentId, prefix, domain } = req.body || {};
   const ttl = Math.min(Math.max(1, Number(ttlMinutes) || DEFAULT_TTL_MINUTES), MAX_TTL_MINUTES);
 
   if (parentId) {
@@ -47,7 +48,7 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const { address, password, token } = await mailProvider.createMailbox();
+    const { address, password, token } = await mailProvider.createMailbox({ prefix, domain });
     const id = uuid();
     const now = Date.now();
     const expiresAt = now + ttl * 60_000;
@@ -59,8 +60,19 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(serializeMailbox({ id, address, parent_id: parentId || null, created_at: now, expires_at: expiresAt }));
   } catch (err) {
+    if (err.userFacing) return res.status(err.httpStatus || 400).json({ error: err.message });
     console.error('[emails] create failed:', err);
     res.status(502).json({ error: 'Failed to provision mailbox from upstream provider', detail: err.message });
+  }
+});
+
+// List currently active mail.tm domains, for a domain picker in the UI.
+router.get('/domains', async (req, res) => {
+  try {
+    res.json({ domains: await mailProvider.listDomains() });
+  } catch (err) {
+    console.error('[emails] domain list failed:', err);
+    res.status(502).json({ error: 'Failed to fetch domains from upstream provider', detail: err.message });
   }
 });
 

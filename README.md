@@ -117,7 +117,8 @@ entirely and mint unlimited accounts.
 
 | Method | Path | Body | Notes |
 |---|---|---|---|
-| POST | `/api/emails` | `{ ttlMinutes?, parentId? }` | create inbox; `parentId` makes it a child/alias grouped under an existing inbox |
+| POST | `/api/emails` | `{ ttlMinutes?, parentId?, prefix?, domain? }` | create inbox; `parentId` makes it a child/alias grouped under an existing inbox |
+| GET | `/api/emails/domains` | — | currently active mail.tm domains, for a domain picker |
 | GET | `/api/emails` | — | list your inboxes |
 | GET | `/api/emails/:id` | — | inbox details + expiry |
 | GET | `/api/emails/:id/messages` | — | full inbox contents |
@@ -136,6 +137,15 @@ curl http://localhost:4000/api/emails/<id>/otp -H 'x-api-key: tma_...'
 ```
 
 Child inbox: `POST /api/emails` with `{"parentId": "<parent-id>"}`.
+
+**Custom address** (SharkLasers/Guerrilla Mail style): pass `prefix` to pick
+the local part yourself instead of getting a random one, and/or `domain` to
+choose which active mail.tm domain to use. A taken prefix or an inactive
+domain returns a `400` with a clear message; if mail.tm itself rate-limits
+the request (its free tier has a fairly tight limit), you'll get a `429`
+telling you to wait a few seconds. The dashboard's "🔁 New address" button
+deletes the current inbox and creates a fresh random one in its place —
+the quick "forget me and start over" pattern from those sites.
 
 ## Phone endpoints
 
