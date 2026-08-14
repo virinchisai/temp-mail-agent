@@ -130,6 +130,32 @@ If you're opening this up for anyone to sign up (not just yourself):
   Twilio bill if `PUBLIC_SIGNUP` isn't respected — not about enabling
   something that doesn't already exist.
 
+## Deploying to Fly.io
+
+`Dockerfile` and `fly.toml` are ready to go — Fly gives a persistent volume
+for the SQLite file and a straightforward free/cheap tier.
+
+```bash
+brew install flyctl                 # or: curl -L https://fly.io/install.sh | sh
+fly auth login                      # opens a browser — this step is on you
+
+# app name in fly.toml must be globally unique; edit it first if taken
+fly apps create temp-mail-agent
+
+fly volumes create temp_mail_data --size 1 --region iad
+
+fly secrets set \
+  SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") \
+  PUBLIC_SIGNUP=true          # only if you actually want open public signup
+
+fly deploy                          # builds remotely even without local Docker running
+```
+
+That's it — `fly deploy` prints the live URL. Redeploy any time with
+`fly deploy` after pushing changes. To add real Twilio SMS later:
+`fly secrets set TWILIO_ACCOUNT_SID=... TWILIO_AUTH_TOKEN=...` (ignored while
+`PUBLIC_SIGNUP=true`, see above).
+
 ## Expiry
 
 A cron job sweeps every minute, deleting mailboxes/numbers past their

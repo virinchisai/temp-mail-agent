@@ -1,0 +1,28 @@
+# Fly.io config. App name must be globally unique — change it if
+# "temp-mail-agent" is already taken (you'll find out at `fly apps create`).
+app = "temp-mail-agent"
+primary_region = "iad"
+
+[build]
+
+[env]
+  PORT = "4000"
+  NODE_ENV = "production"
+  DATA_DIR = "/data"
+  # SESSION_SECRET, PUBLIC_SIGNUP, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN are
+  # set as secrets (`fly secrets set ...`), not here — see README.
+
+[[mounts]]
+  source = "temp_mail_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
