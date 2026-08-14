@@ -61,6 +61,19 @@ lsof -ti:4000 -sTCP:LISTEN | xargs -r kill
 If you changed `PORT` in `.env`, swap `4000` for that value. To check what's
 using a port without killing it first: `lsof -i:4000`.
 
+**That `kill` command runs but the port is still stuck / EADDRINUSE keeps
+coming back**
+You likely stopped the server with `Ctrl+Z` instead of `Ctrl+C`. `Ctrl+Z`
+*suspends* the process (`zsh: suspended`) rather than killing it — it's
+still alive, still holding the port, just paused. A suspended process can't
+even process a plain `kill` (`SIGTERM`) until it's resumed, so that command
+silently does nothing. Force it instead:
+```bash
+lsof -ti:4000 -sTCP:LISTEN | xargs -r kill -9
+```
+Going forward, use `Ctrl+C` to stop `npm start` — it actually terminates the
+process and frees the port immediately, no `kill` needed at all.
+
 **Server exits immediately in production with `SESSION_SECRET must be set`**
 Expected — production mode refuses to run with an insecure auto-generated
 secret. Do step 3 above and set `NODE_ENV=production` only once
