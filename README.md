@@ -205,6 +205,9 @@ curl -X POST http://localhost:4000/api/agent/chat \
 Notes:
 - Uses `claude-opus-5` at `medium` effort — these are short API calls, not hard
   reasoning, so medium keeps latency and cost down. Override with `AGENT_MODEL`.
+- Cost is roughly 3–5¢ per conversation. Setting
+  `AGENT_MODEL=claude-haiku-4-5` drops that to well under a cent and is
+  plenty for this workload.
 - Conversation state lives in the browser and is posted back as `history`; the
   endpoint itself is stateless like the rest of the API.
 - Bounded by `AGENT_MAX_ITERATIONS` (default 30) so a confused run can't loop
@@ -212,6 +215,41 @@ Notes:
 - **Worth knowing:** single actions ("make me an inbox") don't benefit from the
   agent — that's one API call and the model is pure overhead. The value is in
   multi-step requests where the sequence isn't known in advance.
+
+### Running it on a local model instead (no API key)
+
+`litellm.config.yaml` points the assistant at a local [Ollama](https://ollama.com)
+model via a [LiteLLM](https://github.com/BerriAI/litellm) proxy, which accepts
+Anthropic-format requests and translates them. The agent code needs no changes —
+it just talks to a different base URL.
+
+```bash
+python3 -m venv ~/.litellm-venv
+~/.litellm-venv/bin/pip install 'litellm[proxy]' 'fastapi<0.120'
+ollama pull qwen2.5:7b-instruct
+
+# the CLI has a bad bare import; putting its own dir on PYTHONPATH works around it
+PYTHONPATH=~/.litellm-venv/lib/python3.12/site-packages/litellm/proxy \
+  ~/.litellm-venv/bin/litellm --config litellm.config.yaml --port 4141
+```
+
+Then run the app with:
+
+```bash
+ANTHROPIC_BASE_URL=http://127.0.0.1:4141 AGENT_MODEL=local-agent npm start
+```
+
+> ⚠️ **Needs GPU-capable hardware — Apple Silicon or NVIDIA.** Ollama has no
+> GPU acceleration on Intel Macs and falls back to CPU. Measured on an Intel
+> i7-8569U: **1.1 tokens/sec**, which works out to ~9 minutes per agent
+> request. Unusable interactively.
+>
+> **Verified only partially:** the translation layer works — a local
+> `qwen2.5:7b-instruct` returned a correct Anthropic `tool_use` block through
+> this config. A *full* multi-tool agent run was never completed, because the
+> test hardware was too slow to finish one. Expect to tune before relying on
+> it, and note that small models are meaningfully worse at tool calling than
+> Claude regardless of speed.
 
 ## Dashboard
 

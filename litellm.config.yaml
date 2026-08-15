@@ -1,0 +1,23 @@
+# LiteLLM proxy config — lets the assistant run on a local Ollama model
+# with no Anthropic API key and no per-request cost.
+#
+# LiteLLM accepts requests in Anthropic's Messages API format and
+# translates them to Ollama, so the agent code needs no changes: it just
+# points ANTHROPIC_BASE_URL at this proxy instead of api.anthropic.com.
+#
+# Start it with:
+#   ~/.litellm-venv/bin/litellm --config litellm.config.yaml --port 4141
+#
+# `ollama_chat/` (not `ollama/`) is required — it uses Ollama's /api/chat
+# endpoint, which is the one that supports tool calling.
+
+model_list:
+  # The name on the left is what the client asks for. The agent sends
+  # whatever AGENT_MODEL is set to, so this name must match it.
+  - model_name: local-agent
+    litellm_params:
+      model: ollama_chat/qwen2.5:7b-instruct
+      api_base: http://127.0.0.1:11434
+
+litellm_settings:
+  drop_params: true # ignore Anthropic-only params Ollama doesn't understand

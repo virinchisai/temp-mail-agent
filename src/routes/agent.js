@@ -1,6 +1,6 @@
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
-const { runAgent, MissingApiKeyError, MODEL } = require('../agent/agent');
+const { runAgent, MissingApiKeyError, MODEL, isConfigured, isLocal } = require('../agent/agent');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -10,7 +10,7 @@ const MAX_HISTORY = 40; // messages, not turns — keeps a long chat from growin
 // Lets the dashboard hide or disable the chat panel when the deployment
 // has no ANTHROPIC_API_KEY, instead of only finding out on first send.
 router.get('/agent/status', (req, res) => {
-  res.json({ enabled: Boolean(process.env.ANTHROPIC_API_KEY), model: MODEL });
+  res.json({ enabled: isConfigured(), model: MODEL, local: isLocal() });
 });
 
 router.post('/agent/chat', async (req, res) => {

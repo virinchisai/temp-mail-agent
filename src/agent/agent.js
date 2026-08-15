@@ -27,6 +27,18 @@ How to respond:
 
 class MissingApiKeyError extends Error {}
 
+// Two ways to be configured: a real Anthropic key, or a base URL pointing
+// at a local model proxy (see litellm.config.yaml) which needs no key.
+function isConfigured() {
+  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_BASE_URL);
+}
+
+// True when running against a local proxy rather than Anthropic's API —
+// the dashboard surfaces this so it's obvious which model is answering.
+function isLocal() {
+  return Boolean(process.env.ANTHROPIC_BASE_URL);
+}
+
 /**
  * Runs one turn of the conversation to completion.
  *
@@ -37,13 +49,19 @@ class MissingApiKeyError extends Error {}
  * @returns {Promise<{reply: string, steps: Array, messages: Array}>}
  */
 async function runAgent({ apiKey, baseUrl, messages }) {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!isConfigured()) {
     throw new MissingApiKeyError(
-      'ANTHROPIC_API_KEY is not set — the agent cannot run. See .env.example.'
+      'The assistant is not configured. Set ANTHROPIC_API_KEY, or point ' +
+        'ANTHROPIC_BASE_URL at a local model proxy. See .env.example.'
     );
   }
 
-  const client = new Anthropic();
+  // A local proxy (LiteLLM in front of Ollama) needs no real credential,
+  // but the SDK insists on some value — so supply a placeholder rather
+  // than making the user invent a fake key.
+  const client = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY || 'local-proxy-no-key-required',
+  });
   const steps = [];
 
   const tools = buildTools({
@@ -94,4 +112,4 @@ async function runAgent({ apiKey, baseUrl, messages }) {
   return { reply, steps, messages: updated, stopReason: lastMessage?.stop_reason || null };
 }
 
-module.exports = { runAgent, MissingApiKeyError, MODEL };
+module.exports = { runAgent, MissingApiKeyError, MODEL, isConfigured, isLocal };
