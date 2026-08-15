@@ -11,6 +11,7 @@ const registerRoute = require('./routes/register');
 const authRoute = require('./routes/auth');
 const emailsRoute = require('./routes/emails');
 const phonesRoute = require('./routes/phones');
+const agentRoute = require('./routes/agent');
 const { startExpirySweeper } = require('./jobs/expiry');
 
 const app = express();
@@ -39,6 +40,14 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(morgan('dev'));
 
+// The agent reaches its own REST API over loopback, so without this every
+// agent run — regardless of which account triggered it — would share the
+// 127.0.0.1 bucket and exhaust it almost immediately. Safe to skip: in
+// production `trust proxy` means real clients present their forwarded IP,
+// so only genuine same-host calls land here. Each request is still
+// authenticated and scoped to one account's data.
+const isLoopback = (req) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip);
+
 // Baseline limiter for everything.
 app.use(
   rateLimit({
@@ -46,6 +55,7 @@ app.use(
     max: Number(process.env.RATE_LIMIT_PER_MINUTE) || 60,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: isLoopback,
   })
 );
 
@@ -73,6 +83,18 @@ const creationLimiter = rateLimit({
   message: { error: 'Creation rate limit reached — try again later' },
 });
 
+// Each agent turn is one or more LLM calls plus a burst of tool calls, so
+// it is far more expensive than a plain API request and gets its own,
+// much lower ceiling.
+const agentLimiter = rateLimit({
+  windowMs: 60_000,
+  max: Number(process.env.AGENT_RATE_LIMIT_PER_MINUTE) || 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Agent rate limit reached — try again in a minute' },
+});
+app.use('/api/agent/chat', agentLimiter);
+
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.get('/health', (req, res) => res.json({ status: 'ok', time: Date.now() }));
@@ -83,6 +105,7 @@ app.post('/api/emails', creationLimiter);
 app.post('/api/phones', creationLimiter);
 app.use('/api/emails', emailsRoute);
 app.use('/api/phones', phonesRoute);
+app.use('/api', agentRoute);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 app.use((err, req, res, next) => {

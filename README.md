@@ -164,6 +164,55 @@ the quick "forget me and start over" pattern from those sites.
 
 Same shape as email, under `/api/phones` (`number` instead of `address`).
 
+## The assistant (LLM agent)
+
+Optional, and off unless you set `ANTHROPIC_API_KEY`. Everything else works
+without it.
+
+This is what makes the project an *agent* rather than only a REST service:
+instead of you picking which endpoint to call, you describe what you want and
+a model decides which actions to take, in what order, and when it's done.
+
+> *"Create an inbox, then watch it for a couple of minutes and tell me the
+> verification code as soon as one arrives."*
+
+The model works through that by calling `create_inbox` → `get_otp` → `wait` →
+`get_otp` … until it has an answer or decides to stop. The dashboard shows
+every tool call it makes, so the run is auditable rather than a black box.
+
+**The tools are this service's own REST API** — nothing is reimplemented.
+`src/agent/tools.js` wraps the endpoints above and authenticates with the same
+`tma_` key as any other client, which also means the agent can only ever touch
+the inboxes belonging to the account that invoked it.
+
+| Piece | What it does |
+|---|---|
+| `src/agent/tools.js` | The 12 tools (create/list/read/otp/extend/delete for email + phone, plus `wait`) |
+| `src/agent/agent.js` | The loop — Anthropic SDK Tool Runner, system prompt, step capture |
+| `src/routes/agent.js` | `POST /api/agent/chat` and `GET /api/agent/status` |
+
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| GET | `/api/agent/status` | — | `{enabled, model}` — whether a key is configured |
+| POST | `/api/agent/chat` | `{ message, history? }` | Returns `{reply, steps, history}`; `steps` is the tool trace |
+
+```bash
+curl -X POST http://localhost:4000/api/agent/chat \
+  -H 'x-api-key: tma_...' -H 'Content-Type: application/json' \
+  -d '{"message":"Create an inbox that lasts 30 minutes and give me the address."}'
+```
+
+Notes:
+- Uses `claude-opus-5` at `medium` effort — these are short API calls, not hard
+  reasoning, so medium keeps latency and cost down. Override with `AGENT_MODEL`.
+- Conversation state lives in the browser and is posted back as `history`; the
+  endpoint itself is stateless like the rest of the API.
+- Bounded by `AGENT_MAX_ITERATIONS` (default 30) so a confused run can't loop
+  forever, and by its own rate limit (default 10/min).
+- **Worth knowing:** single actions ("make me an inbox") don't benefit from the
+  agent — that's one API call and the model is pure overhead. The value is in
+  multi-step requests where the sequence isn't known in advance.
+
 ## Dashboard
 
 Everything auto-watches itself — create an inbox/number and its messages

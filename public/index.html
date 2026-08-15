@@ -78,6 +78,38 @@
         <div id="mfaPanelContent"></div>
       </section>
 
+      <section class="agent-wrap">
+        <div class="panel agent-panel">
+          <div class="panel-head">
+            <h2>Assistant</h2>
+            <span id="agentModelBadge" class="badge"></span>
+          </div>
+
+          <p id="agentDisabled" class="agent-disabled hidden">
+            The assistant needs an <code>ANTHROPIC_API_KEY</code> in your <code>.env</code> to run.
+            Everything else on this page works without it.
+          </p>
+
+          <div id="agentTranscript" class="agent-transcript">
+            <p class="empty muted">
+              Ask for what you want in plain English — the assistant decides which actions to take.
+            </p>
+          </div>
+
+          <div id="agentExamples" class="agent-examples">
+            <button type="button" class="small" data-prompt="Create an inbox that lasts 30 minutes and give me the address.">Create an inbox</button>
+            <button type="button" class="small" data-prompt="Create an inbox, then watch it for a couple of minutes and tell me the verification code as soon as one arrives.">Create and watch for a code</button>
+            <button type="button" class="small" data-prompt="List my inboxes and tell me which ones expire soonest.">What do I have?</button>
+          </div>
+
+          <form id="agentForm" class="agent-input">
+            <label class="sr-only" for="agentInput">Message the assistant</label>
+            <input id="agentInput" type="text" autocomplete="off" placeholder="e.g. get me an inbox and watch for a signup code" />
+            <button id="agentSend" class="primary" type="submit">Send</button>
+          </form>
+        </div>
+      </section>
+
       <main class="columns">
         <section class="panel">
           <div class="panel-head">

@@ -158,6 +158,7 @@
     setKeyMasked(true);
 
     loadEmailDomains();
+    loadAgentStatus();
   }
 
   async function loadEmailDomains() {
@@ -247,6 +248,103 @@
   function setKeyMasked(masked) {
     const el = document.getElementById('apiKeyDisplay');
     el.textContent = masked ? '••••••••••••••••' : el.dataset.full;
+  }
+
+  // ---------- agent chat ----------
+
+  const agent = { history: [], busy: false, enabled: false };
+
+  async function loadAgentStatus() {
+    const badge = document.getElementById('agentModelBadge');
+    try {
+      const status = await api('/api/agent/status');
+      agent.enabled = status.enabled;
+      badge.textContent = status.enabled ? status.model : 'unavailable';
+      badge.className = `badge ${status.enabled ? 'on' : 'mock'}`;
+      document.getElementById('agentDisabled').classList.toggle('hidden', status.enabled);
+      document.getElementById('agentInput').disabled = !status.enabled;
+      document.getElementById('agentSend').disabled = !status.enabled;
+    } catch {
+      agent.enabled = false;
+      badge.textContent = 'unavailable';
+      badge.className = 'badge mock';
+    }
+  }
+
+  function agentAppend(node) {
+    const root = document.getElementById('agentTranscript');
+    const placeholder = root.querySelector('.empty');
+    if (placeholder) placeholder.remove();
+    root.appendChild(node);
+    root.scrollTop = root.scrollHeight;
+  }
+
+  function agentBubble(role, text) {
+    const el = document.createElement('div');
+    el.className = `agent-msg ${role}`;
+    el.textContent = text;
+    return el;
+  }
+
+  // One line per tool call. This trace is the point of an agent UI — it
+  // shows the model choosing actions rather than a form firing a fixed request.
+  function agentToolLine({ name, input, result }) {
+    const el = document.createElement('div');
+    el.className = 'agent-tool';
+    const args = JSON.stringify(input ?? {});
+    const out = String(result ?? '');
+    el.innerHTML =
+      `<span class="tool-name">${escapeHtml(name)}</span>` +
+      `${escapeHtml(args.length > 80 ? args.slice(0, 80) + '…' : args)}<br>` +
+      `↳ ${escapeHtml(out.length > 160 ? out.slice(0, 160) + '…' : out)}`;
+    return el;
+  }
+
+  function setAgentBusy(busy) {
+    agent.busy = busy;
+    const send = document.getElementById('agentSend');
+    send.disabled = busy || !agent.enabled;
+    send.textContent = busy ? 'Working…' : 'Send';
+    document.getElementById('agentInput').disabled = busy || !agent.enabled;
+  }
+
+  async function sendAgentMessage(text) {
+    if (agent.busy || !agent.enabled || !text.trim()) return;
+
+    agentAppend(agentBubble('user', text));
+    document.getElementById('agentInput').value = '';
+    setAgentBusy(true);
+
+    const thinking = agentBubble('assistant', 'Thinking…');
+    thinking.classList.add('muted');
+    agentAppend(thinking);
+
+    try {
+      const data = await api('/api/agent/chat', {
+        method: 'POST',
+        body: JSON.stringify({ message: text, history: agent.history }),
+      });
+      thinking.remove();
+
+      // Replay the run in order so the tool calls appear as they happened,
+      // rather than only showing the final answer.
+      for (const step of data.steps || []) {
+        if (step.type === 'tool') agentAppend(agentToolLine(step));
+        else if (step.type === 'text' && step.text !== data.reply) {
+          agentAppend(agentBubble('assistant', step.text));
+        }
+      }
+      agentAppend(agentBubble('assistant', data.reply));
+      agent.history = data.history || agent.history;
+
+      // The agent may have created or deleted things — resync the panels.
+      await refreshAll();
+    } catch (err) {
+      thinking.remove();
+      agentAppend(agentBubble('error', err.message));
+    } finally {
+      setAgentBusy(false);
+    }
   }
 
   // ---------- MFA management panel ----------
@@ -722,6 +820,15 @@
     document.getElementById('refreshPhonesBtn').addEventListener('click', async () => {
       await refreshPhones();
       toast('Number list refreshed', 'success');
+    });
+
+    document.getElementById('agentForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      sendAgentMessage(document.getElementById('agentInput').value);
+    });
+    document.getElementById('agentExamples').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-prompt]');
+      if (btn) sendAgentMessage(btn.dataset.prompt);
     });
 
     // live countdowns without a full re-render
